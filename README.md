@@ -1,6 +1,5 @@
 # demign
 Código para procesar Modelo de Elevación del IGN:
-- Elimina valores noData que meten ruido (espaciado) en el geoserver en algunos tiles
 - Convierte archivos a tif desde img
 - Agrega render piramidal/overviews para mejorar performance en geoserver
 
