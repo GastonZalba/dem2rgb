@@ -1,54 +1,118 @@
 
-import sys
 import os
+import sys
+import argparse
 import numpy as np
 
-try:
-    from osgeo import gdal
-except:
-    sys.exit('ERROR: osgeo module was not found')
+import rasterio
+from rasterio.warp import Resampling
 
-INPUT_PATH = 'input'
-OUTPUT_PATH = 'output'
+input_folder = 'input'
+output_folder = 'output'
+add_overviews = True
+format = 'grayscale'
 
 overviews = [2, 4, 8, 16, 32, 64, 128, 256]
-        
-if not os.path.exists(INPUT_PATH):
-    sys.exit(f'ERROR: No se encuentra la carpeta {INPUT_PATH}')
 
-if not os.path.exists(OUTPUT_PATH):
-    os.makedirs(OUTPUT_PATH)
-    print(f'Creada carpeta {OUTPUT_PATH}')
+parser = argparse.ArgumentParser(description='Script to procces DEM files to grayscale float, rgb mapbox and rgb terrarium')
+parser.add_argument('--input', type=str, metavar='Input folder', default=input_folder,
+                    help='Folder path with the grayscale images (default: %(default)s)')
+parser.add_argument('--output', type=str, metavar='Output folder', default=output_folder,
+                    help='Folder path to save the images (default: %(default)s)')
+parser.add_argument('--format', type=str, metavar='Format', default=format,
+                    help='Output image format: `grayscale`, `terrarium` and `mapbox` (default: %(default)s)')
 
-for subdir, dirs, files in os.walk(INPUT_PATH):
+args = parser.parse_args()
+
+input_folder = args.input
+output_folder = args.output
+format = args.format
+
+if not os.path.exists(input_folder):
+    sys.exit(f'ERROR: folder {input_folder} has not be found')
+
+output_folder = f'{output_folder}\{format}'
+
+for subdir, dirs, files in os.walk(input_folder):
 
     for file in files:
         filepath = subdir + os.sep + file
 
         if file.endswith(".img"):
 
-            print('File:', file)
-
-            file_ds = gdal.Open(filepath, gdal.GA_ReadOnly)
-
-            band = file_ds.GetRasterBand(1)
-            noDataValue = band.GetNoDataValue() 
-
-            array = band.ReadAsArray()
+            with rasterio.open(filepath) as src:
+                dem = src.read(1)
+                noDataValue = src.nodata
+                meta = src.meta
 
             fileWithoutExtension = os.path.splitext(file)[0]
 
-            OUTPUT = f'{OUTPUT_PATH}\{fileWithoutExtension}.tif'
+            if not os.path.exists(output_folder):
+                os.makedirs(output_folder)
+                print(f'Created folder {output_folder}')
 
-            kwargs = {
-                'format': 'GTiff',
-                'multithread': True
-            }
+            out = f'{output_folder}\{fileWithoutExtension}.tif'
+            
+            print(f'Exporting {out}')
+            
+            with rasterio.Env(GDAL_TIFF_INTERNAL_MASK=True):
 
-            ds = gdal.Warp(OUTPUT, file_ds, **kwargs)
+                if format == 'grayscale':
+                    # one band export
+                    meta.update({
+                        'driver': 'GTiff',
+                        'compress': "deflate",
+                        'multithread': True,
+                        'tiled': True,
+                        'tfw': 'YES'
+                    })
+                    with rasterio.open(out, 'w', **meta) as dst:
+                        dst.write(dem, 1)
+                        if add_overviews:
+                            dst.build_overviews(
+                                [2, 4, 8, 16, 32, 64, 128, 256],
+                                Resampling.average
+                            )
 
-            ds.BuildOverviews("AVERAGE", overviews)
+                else:
+                    # three bands export
+                    shape = dem.shape
+                    r = np.zeros(shape)
+                    g = np.zeros(shape)
+                    b = np.zeros(shape)
 
-            ds = None
+                    meta.update({
+                        'driver': 'GTiff',
+                        'multithread': True,
+                        'tiled': True,
+                        'dtype': rasterio.uint8,
+                        'nodata': None,
+                        'count': 3,
+                        'compress': 'deflate',
+                        'tfw': 'YES'
+                    })
 
+                    internal_mask = np.asarray(np.where(dem == noDataValue, False, True))
 
+                    if format == 'mapbox':
+                        r += np.floor_divide((100000 + dem * 10), 65536)
+                        g += np.floor_divide((100000 + dem * 10), 256) - r * 256
+                        b += np.floor(100000 + dem * 10) - r * 65536 - g * 256
+
+                    elif format == 'terrarium':
+                        dem += 32768
+                        r += np.floor_divide(dem, 256)
+                        g += np.mod(dem, 256)
+                        b += np.floor((dem - np.floor(dem)) * 256)
+
+                    with rasterio.open(out, 'w', **meta) as dst:
+                        dst.write_band(1, r.astype(rasterio.uint8))
+                        dst.write_band(2, g.astype(rasterio.uint8))
+                        dst.write_band(3, b.astype(rasterio.uint8))
+                        dst.write_mask(internal_mask)
+
+                        if add_overviews:
+                            dst.build_overviews(
+                                [2, 4, 8, 16, 32, 64, 128, 256],
+                                Resampling.average
+                            )
