@@ -21,12 +21,14 @@ parser.add_argument('--output', type=str, metavar='Output folder', default=outpu
                     help='Folder path to save the images (default: %(default)s)')
 parser.add_argument('--format', type=str, metavar='Format', default=format,
                     help='Output image format: `grayscale`, `terrarium` and `mapbox` (default: %(default)s)')
-
+parser.add_argument('--overviews', type=bool, metavar='Overviews', default=format,
+                    help='Add overviews to the export (default: %(default)s)')
 args = parser.parse_args()
 
 input_folder = args.input
 output_folder = args.output
 format = args.format
+add_overviews = args.overviews
 
 if not os.path.exists(input_folder):
     sys.exit(f'ERROR: folder {input_folder} has not be found')
