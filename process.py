@@ -7,10 +7,14 @@ import numpy as np
 import rasterio
 from rasterio.warp import Resampling
 
+def getExtension(filename):
+    return os.path.splitext(filename)[1]
+
 input_folder = 'input'
 output_folder = 'output'
 add_overviews = True
 format = 'grayscale'
+extensions = ['.tif', '.tiff', '.vrt', '.img']
 
 overviews = [2, 4, 8, 16, 32, 64, 128, 256]
 
@@ -40,7 +44,7 @@ for subdir, dirs, files in os.walk(input_folder):
     for file in files:
         filepath = subdir + os.sep + file
 
-        if file.endswith(".img"):
+        if (getExtension(file) in extensions):
 
             with rasterio.open(filepath) as src:
                 dem = src.read(1)
