@@ -17,18 +17,21 @@ format = 'grayscale'
 extensions = ['.tif', '.tiff', '.vrt', '.img']
 
 overviews = [2, 4, 8, 16, 32, 64, 128, 256]
+tfw = 'YES'
 
-parser = argparse.ArgumentParser(description='Script to procces DEM files to grayscale float, rgb mapbox and rgb terrarium')
+parser = argparse.ArgumentParser(description='Script to procces DEM/DTM files to grayscale float, rgb mapbox and rgb terrarium')
 parser.add_argument('--input', type=str, metavar='Input folder', default=input_folder,
                     help='Folder path with the grayscale images (default: %(default)s)')
 parser.add_argument('--output', type=str, metavar='Output folder', default=output_folder,
                     help='Folder path to save the images (default: %(default)s)')
 parser.add_argument('--format', type=str, metavar='Format', default=format,
                     help='Output image format: `grayscale`, `terrarium` and `mapbox` (default: %(default)s)')
-parser.add_argument('--overviews', type=bool, metavar='Overviews', default=format,
+parser.add_argument('--overviews', type=bool, metavar='Overviews', default=add_overviews,
                     help='Add overviews to the export (default: %(default)s)')
-args = parser.parse_args()
+parser.add_argument('--tfw', type=str, metavar='TFW world file', default=tfw,
+                    help='Export TFW file (default: %(default)s)')
 
+args = parser.parse_args()
 input_folder = args.input
 output_folder = args.output
 format = args.format
@@ -95,7 +98,7 @@ for subdir, dirs, files in os.walk(input_folder):
                         'nodata': None,
                         'count': 3,
                         'compress': 'deflate',
-                        'tfw': 'YES'
+                        'tfw': tfw
                     })
 
                     internal_mask = np.asarray(np.where(dem == noDataValue, False, True))
