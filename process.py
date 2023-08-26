@@ -12,12 +12,12 @@ def getExtension(filename):
 
 input_folder = 'input'
 output_folder = 'output'
-add_overviews = True
+disable_overviews = False
+disable_tfw = False
 format = 'grayscale'
 extensions = ['.tif', '.tiff', '.vrt', '.img']
 
 overviews = [2, 4, 8, 16, 32, 64, 128, 256]
-tfw = 'YES'
 
 parser = argparse.ArgumentParser(description='Script to procces DEM/DTM files to grayscale float, rgb mapbox and rgb terrarium')
 parser.add_argument('--input', type=str, metavar='Input folder', default=input_folder,
@@ -26,16 +26,17 @@ parser.add_argument('--output', type=str, metavar='Output folder', default=outpu
                     help='Folder path to save the images (default: %(default)s)')
 parser.add_argument('--format', type=str, metavar='Format', default=format,
                     help='Output image format: `grayscale`, `terrarium` and `mapbox` (default: %(default)s)')
-parser.add_argument('--overviews', type=bool, metavar='Overviews', default=add_overviews,
+parser.add_argument('--disableoverviews', action='store_true', default=disable_overviews,
                     help='Add overviews to the export (default: %(default)s)')
-parser.add_argument('--tfw', type=str, metavar='TFW world file', default=tfw,
+parser.add_argument('--disabletfw', action='store_true', default=disable_tfw,
                     help='Export TFW file (default: %(default)s)')
 
 args = parser.parse_args()
 input_folder = args.input
 output_folder = args.output
 format = args.format
-add_overviews = args.overviews
+disable_overviews = args.disableoverviews
+disable_tfw = args.disabletfw
 
 if not os.path.exists(input_folder):
     sys.exit(f'ERROR: folder {input_folder} has not be found')
@@ -73,13 +74,13 @@ for subdir, dirs, files in os.walk(input_folder):
                         'compress': "deflate",
                         'multithread': True,
                         'tiled': True,
-                        'tfw': 'YES'
+                        'tfw': 'YES' if not disable_tfw else 'NO'
                     })
                     with rasterio.open(out, 'w', **meta) as dst:
                         dst.write(dem, 1)
-                        if add_overviews:
+                        if not disable_overviews:
                             dst.build_overviews(
-                                [2, 4, 8, 16, 32, 64, 128, 256],
+                                overviews,
                                 Resampling.average
                             )
 
@@ -98,7 +99,7 @@ for subdir, dirs, files in os.walk(input_folder):
                         'nodata': None,
                         'count': 3,
                         'compress': 'deflate',
-                        'tfw': tfw
+                        'tfw': 'YES' if not disable_tfw else 'NO'
                     })
 
                     internal_mask = np.asarray(np.where(dem == noDataValue, False, True))
@@ -120,7 +121,7 @@ for subdir, dirs, files in os.walk(input_folder):
                         dst.write_band(3, b.astype(rasterio.uint8))
                         dst.write_mask(internal_mask)
 
-                        if add_overviews:
+                        if not disable_overviews:
                             dst.build_overviews(
                                 [2, 4, 8, 16, 32, 64, 128, 256],
                                 Resampling.average
