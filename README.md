@@ -9,6 +9,14 @@ Convert multiples DEM/DTM images/tiles to geoserver optimized grayscale float DE
 - rasterio + GDAL
 
 ## Installation
+
+### Using requeriments and Python 3.9
+- Create an virtual enviroment `py -3.9 -m venv .venv`
+- Load the enviroment `.venv/Scripts/activate`
+- Install the requeriments `pip install -r requirements.txt`
+- Manually install an npm package to compress the 3d models: `npm install -g gltf-pipeline`: [gltf-pipeline](https://github.com/CesiumGS/gltf-pipeline)
+
+### Manually
 - Download [GDAL](https://www.lfd.uci.edu/~gohlke/pythonlibs/#gdal), selecting the newest version of GDAL, and the appropriate one depending on the version of Python installed and the processor.If you are using Python 3.7, for example, download and then install using `pip install GDAL-3.3.1-cp37-cp37m-win_amd64.whl` (always adjusting according to the downloaded version).
 - Download [Rasterio](https://www.lfd.uci.edu/~gohlke/pythonlibs/#rasterio), selecting the version analogous to GDAL, and install in the same way.
 - To be able to use the installed package, configure environment variables (putting the full path depending on where the package is installed and the python version):
