@@ -33,6 +33,8 @@ parser.add_argument('--disabletfw', action='store_true', default=disable_tfw,
                     help='Export TFW file (default: %(default)s)')
 parser.add_argument('--disablemask', action='store_true', default=disable_mask,
                     help='Export file with internal mask (default: %(default)s)')
+parser.add_argument('--nodatadst', type=int, metavar='NoDataTarget', default=None,
+                    help='Output NoData value (default is not changed)')
 
 args = parser.parse_args()
 input_folder = args.input
@@ -41,6 +43,7 @@ format = args.format
 disable_overviews = args.disableoverviews
 disable_tfw = args.disabletfw
 disable_mask = args.disablemask
+no_data_dst = args.nodatadst
 
 if not os.path.exists(input_folder):
     sys.exit(f'ERROR: folder {input_folder} has not be found')
@@ -58,6 +61,12 @@ for subdir, dirs, files in os.walk(input_folder):
                 dem = src.read(1)
                 noDataValue = src.nodata
                 meta = src.meta
+            
+            # Reemplazar valores NoData por el destino
+            if no_data_dst is not None and noDataValue is not None:
+                dem = np.where(dem == noDataValue, no_data_dst, dem)
+                noDataValue = no_data_dst
+                meta.update({'nodata': noDataValue})
 
             fileWithoutExtension = os.path.splitext(file)[0]
 
@@ -78,10 +87,17 @@ for subdir, dirs, files in os.walk(input_folder):
                         'compress': "deflate",
                         'multithread': True,
                         'tiled': True,
-                        'tfw': 'YES' if not disable_tfw else 'NO'
+                        'tfw': 'YES' if not disable_tfw else 'NO',
+                        'nodata': noDataValue if disable_mask else None
                     })
+                        
                     with rasterio.open(out, 'w', **meta) as dst:
                         dst.write(dem, 1)
+                                               
+                        if not disable_mask:      
+                            internal_mask = np.asarray(np.where(dem == noDataValue, False, True))
+                            dst.write_mask(internal_mask)
+                            
                         if not disable_overviews:
                             dst.build_overviews(
                                 overviews,
@@ -100,11 +116,13 @@ for subdir, dirs, files in os.walk(input_folder):
                         'multithread': True,
                         'tiled': True,
                         'dtype': rasterio.uint8,
-                        'nodata': None,
+                        'nodata': None, # rgb will not have a noData value. it should be used the rgb computed as transparency layer
                         'count': 3,
                         'compress': 'deflate',
                         'tfw': 'YES' if not disable_tfw else 'NO'
                     })
+                    
+                    internal_mask = np.asarray(np.where(dem == noDataValue, False, True))
 
                     if format == 'mapbox':
                         r += np.floor_divide((100000 + dem * 10), 65536)
@@ -126,7 +144,6 @@ for subdir, dirs, files in os.walk(input_folder):
                         dst.write_band(3, b.astype(rasterio.uint8))
                         
                         if not disable_mask:
-                            internal_mask = np.asarray(np.where(dem == noDataValue, False, True))
                             dst.write_mask(internal_mask)
 
                         if not disable_overviews:
